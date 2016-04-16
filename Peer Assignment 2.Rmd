@@ -1,0 +1,135 @@
+---
+title: "Peer Assignment 2"
+author: "Isaac Moore"
+date: "April 5, 2016"
+output: html_document
+---
+## Synopsis
+This data analysis will use data from the U.S. National Oceanic and Atmospheric Administration’s (NOAA) stop database. The data that will be used is from 1950 (when the NOAA database was established) to November 2011. This analysis will attempt to determine which storm events are most harmful, in terms of fatalities and injuries and which storm events cause the greatest economic consequences.  
+
+### Data Processing  
+Loading libraries to be used
+```{r echo = TRUE}
+library(dplyr)
+library(ggplot2)
+```
+
+Set the working directory for the analysis  
+```{r echo = TRUE}
+wd <- setwd("~/Google Drive/Data Science/Coursera - John Hopkins University/Course 5 - Reproducible Research/Week 4/Peer Assignment 2")
+```
+
+Download the data to the working directory  
+```{r echo = TRUE,cache = TRUE}
+fileURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(fileURL, destfile = paste0(wd, "/stormdata.csv.bz2"), method = "curl")
+```
+
+Add the data to the environment and view the data  
+```{r echo = TRUE,cache = TRUE}
+data <- tbl_df(read.csv("stormdata.csv.bz2", header = TRUE, sep = ",", stringsAsFactors = FALSE))
+data
+```
+
+### Conversion  
+The class of the "BGN_DATE" observations are characters. I will convert the date variables to DATE class. 
+```{r echo = TRUE}
+data$BGN_DATE <- as.Date(data$BGN_DATE, "%m/%d/%Y")
+class(data$BGN_DATE)
+```  
+We can see from this [codebook](https://rstudio-pubs-static.s3.amazonaws.com/58957_37b6723ee52b455990e149edde45e5b6.html) that the measurement for property damage and crop damage are in seperate fields, one displaying the dollar amount and the other field displaying the factor - Thousand ("K" or "k"), Millions ("M" or "m"), or Billions("B", "b"), and Numbers displaying displaying Tens, which will not need to be converted.  
+Displaying the seperation.  
+```{r echo = TRUE}
+table(data$PROPDMG)
+table(data$CROPDMG)
+unique(data$PROPDMGEXP)
+```
+Conversion to put the actual amounts in PROPDMG and CROPDMG.  
+```{r echo = TRUE}
+data[data$PROPDMGEXP == "K", ]$PROPDMG <- data[data$PROPDMGEXP == "K", ]$PROPDMG * 
+    1000
+data[data$PROPDMGEXP == "M", ]$PROPDMG <- data[data$PROPDMGEXP == "M", ]$PROPDMG * 
+    1000000
+data[data$PROPDMGEXP == "m", ]$PROPDMG <- data[data$PROPDMGEXP == "m", ]$PROPDMG * 
+    1000000
+data[data$PROPDMGEXP == "B", ]$PROPDMG <- data[data$PROPDMGEXP == "B", ]$PROPDMG * 
+    1000000000
+data[data$CROPDMGEXP == "K", ]$CROPDMG <- data[data$CROPDMGEXP == "K", ]$CROPDMG * 
+    1000
+data[data$CROPDMGEXP == "k", ]$CROPDMG <- data[data$CROPDMGEXP == "k", ]$CROPDMG * 
+    1000
+data[data$CROPDMGEXP == "M", ]$CROPDMG <- data[data$CROPDMGEXP == "M", ]$CROPDMG * 
+    1000000
+data[data$CROPDMGEXP == "m", ]$CROPDMG <- data[data$CROPDMGEXP == "m", ]$CROPDMG * 
+    1000000
+data[data$CROPDMGEXP == "B", ]$CROPDMG <- data[data$CROPDMGEXP == "B", ]$CROPDMG * 
+    1000000000
+```
+### Results  
+
+#### Injuries
+We'll see which storm events casue the most fatalities  
+```{r echo = TRUE}
+fatalities <- data %>% group_by(EVTYPE) %>%
+        summarise(total_fatalities = sum(FATALITIES)) %>%
+        arrange(desc(total_fatalities)) %>%
+        filter(total_fatalities >= 1)
+fatalities
+```
+
+We'll see which storm events casue the most injuries  
+```{r echo = TRUE}
+injuries <- data %>% group_by(EVTYPE) %>%
+        summarise(total_injuries = sum(INJURIES)) %>%
+        arrange(desc(total_injuries)) %>%
+        filter(total_injuries >= 1)
+injuries
+```
+
+#### Economic Damage
+We'll see which storm events casue the most property damage.  
+```{r echo = TRUE}
+prop_dmg <- data %>% group_by(EVTYPE) %>%
+        summarise(total_propdmg = sum(PROPDMG)) %>%
+        arrange(desc(total_propdmg)) %>%
+        filter(total_propdmg >= 1)
+prop_dmg
+```  
+We'll see which storm events casue the most crop damage.  
+```{r echo = TRUE}
+crop_dmg <- data %>% group_by(EVTYPE) %>%
+        summarise(total_cropdmg = sum(CROPDMG)) %>%
+        arrange(desc(total_cropdmg)) %>%
+        filter(total_cropdmg >= 1)
+crop_dmg
+```
+
+### We see that tornados cause the most fatalities and injuries, floods casue the most property damage, and droughts caused the most crop damage.  
+We plot to see if the fatalities and injuries per year have decreased since 1950 or have stayed the same until 2011, to determine if better warning systems or shelters are needed.    
+
+We will start by nitiating the plot data.
+```{r echo = TRUE}
+plot_data <- data %>% select(EVTYPE, FATALITIES, INJURIES, BGN_DATE) %>%
+		filter(EVTYPE == "TORNADO")
+```  
+### Plot of tornado fatalities by year
+```{r echo = TRUE}
+ggplot(plot_data, aes(BGN_DATE, FATALITIES))+
+        geom_line()+
+        ggtitle("Tornado Fatalities by Year")+
+        xlab("Year")+
+        ylab("Number of Fatalities")
+```  
+  
+  We can see that the number of fatalities slightly decreases by year, with the exception of the tornado in early 2010.  
+
+### Plot of tornado injuries by year
+```{r echo = TRUE}
+ggplot(plot_data, aes(BGN_DATE, INJURIES))+
+        geom_line()+
+        ggtitle("Tornado Injuries by Year")+
+        xlab("Year")+
+        ylab("Number of Injuries")
+```
+  
+  We can see from the plot that the injuries vary from yar to year, with exceptions in the early 1950s, mid and late 1970s, and the tornado that casued the most fatalities in early 2010.  
